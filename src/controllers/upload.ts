@@ -15,7 +15,7 @@ const router = express.Router();
 export const uploadFile = async (req: Request, res: Response) => {
   try {
     const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING as string;
-    const containerName = 'documents';
+    const containerName = 'acer-proactivate';
 
     if (!AZURE_STORAGE_CONNECTION_STRING) {
       throw new Error('Azure Storage connection string not found');

@@ -1,7 +1,6 @@
 services:
   db:
     image: postgres
-    container_name: go_program_container
     hostname: localhost
     ports:
       - "5432:5432"
