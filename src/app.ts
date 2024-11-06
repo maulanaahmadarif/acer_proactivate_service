@@ -20,8 +20,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Allowed origins array
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://go-program-app.web.app',
-  'https://gopro-lenovoid.com',
+  'https://acer-proactivate.web.app',
+  'https://proactivate-acer.com',
 ];
 
 // CORS options
