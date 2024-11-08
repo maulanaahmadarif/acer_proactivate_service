@@ -16,17 +16,18 @@ interface EmailOptions {
   subject: string;
   text?: string;
   html?: string;
+  bcc?: string;
 }
 
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
     const mailOptions = {
-      from: `"Go Pro Lenovo Team" <${process.env.EMAIL_USER}>`, // Sender address
+      from: `"Acer Proactivate Team" <${process.env.EMAIL_USER}>`, // Sender address
       to: options.to,
       subject: options.subject,
       text: options.text,
       html: options.html,
-      bcc: process.env.EMAIL_BCC
+      bcc: options.bcc
     };
 
     await transporter.sendMail(mailOptions);
