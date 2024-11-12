@@ -111,7 +111,6 @@ export const userSignup = async (req: Request, res: Response) => {
       phone_number,
       job_title,
       company_id,
-      user_type,
       fullname,
       custom_company
     } = req.body
@@ -135,7 +134,7 @@ export const userSignup = async (req: Request, res: Response) => {
       username,
       company_id: normalize_company_id,
       email,
-      user_type,
+      user_type: 'T2',
       password_hash: hashedPassword,
       program_saled_id: normalize_program_saled_id,
       phone_number,

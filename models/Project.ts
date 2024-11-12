@@ -21,7 +21,7 @@ export interface ProjectAttributes {
   project_id?: number;
   name: string;
   description?: string;
-  user_id: number;
+  user_id?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
