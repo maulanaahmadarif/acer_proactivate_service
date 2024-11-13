@@ -182,7 +182,7 @@ export const createFormType = async (req: Request, res: Response) => {
 };
 
 export const formSubmission = async (req: any, res: Response) => {
-  const { form_type_id, form_data, project_id, product_quantity = 0 } = req.body;
+  const { form_type_id, form_data, project_id, product_quantity = 0, pic_done = false } = req.body;
 
   const transaction = await sequelize.transaction();
 
@@ -203,7 +203,9 @@ export const formSubmission = async (req: any, res: Response) => {
     const company = await Company.findByPk(companyId, { transaction });
     const user = await User.findByPk(userId, { transaction });
     const formType = await FormType.findByPk(form_type_id, { transaction });
-    const formsCount = await Form.count(
+    const currentProject = await Project.findByPk(project_id, { transaction });
+    const allFormType = await FormType.findAll();
+    const formsCount = await Form.findAll(
       {
         where: {
           user_id: userId,
@@ -214,7 +216,14 @@ export const formSubmission = async (req: any, res: Response) => {
       }
     )
 
+    const completedIds = []
+
+    for (let i = 0; i < formsCount.length; i++) {
+      completedIds.push(formsCount[i].form_type_id)
+    }
+
     let additionalPoint = 0;
+
     if (formType) {
       if (formType.form_type_id === 1) {
         if (product_quantity >= 1 && product_quantity <= 50) {
@@ -285,25 +294,66 @@ export const formSubmission = async (req: any, res: Response) => {
 
   
     if (user?.user_type === 'T2') {
-      if (formsCount === 6) {
+      if (formsCount.length === 6) {
         additionalPoint += 200
         isProjectFormCompleted = true;
       }
     } else if (user?.user_type === 'T1') {
-      if (formsCount === 4) {
+      if (formsCount.length === 4) {
         additionalPoint += 200
         isProjectFormCompleted = true;
       }
     }
 
+    let partialCompleted = currentProject?.partial_complete_form_type_id;
+
+    if (partialCompleted === null || partialCompleted === undefined) partialCompleted = [];
+
+    if (Number(form_type_id) > 0 && Number(form_type_id) < 6) {
+      for (let i = Number(form_type_id) - 1; i > 0; i--) {
+        const id = i;
+        const index = i - 1;
+        if (!currentProject?.partial_complete_form_type_id?.includes(index) && !completedIds.includes(id)) {
+          partialCompleted = [...partialCompleted, id];
+          additionalPoint += allFormType[index].point_reward / 2
+        }
+      }
+    }
+
+    if (currentProject) {
+      partialCompleted = [...new Set(partialCompleted)]
+      currentProject.partial_complete_form_type_id = partialCompleted;
+      await currentProject.save({ transaction });
+    }
+
     if (user && formType) {
-      user.total_points = (user.total_points || 0) + formType.point_reward + additionalPoint; // Assuming `points` field exists on User
+      let point_reward = formType.point_reward;
+
+      if (partialCompleted.includes(formType.form_type_id) && !completedIds.includes(formType.form_type_id)) {
+        point_reward /= 2;
+      }
+
+      if (formType.form_type_id === 3) {
+        point_reward = pic_done ? point_reward : point_reward / 2
+      }
+
+      console.log('point_reward ', point_reward);
+      user.total_points = (user.total_points || 0) + point_reward + additionalPoint; // Assuming `points` field exists on User
       user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint;
       await user.save({ transaction });
     }
 
     if (company && formType) {
-      company.total_points = (company.total_points || 0) + formType.point_reward + additionalPoint; // Assuming `points` field exists on User
+      let point_reward = formType.point_reward;
+
+      if (partialCompleted.includes(formType.form_type_id) && !completedIds.includes(formType.form_type_id)) {
+        point_reward /= 2;
+      }
+
+      if (formType.form_type_id === 3) {
+        point_reward = pic_done ? point_reward : point_reward / 2
+      }
+      company.total_points = (company.total_points || 0) + point_reward + additionalPoint; // Assuming `points` field exists on User
       await company.save({ transaction });
     }
 
