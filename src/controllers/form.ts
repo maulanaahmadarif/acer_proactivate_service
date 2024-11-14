@@ -364,9 +364,7 @@ export const formSubmission = async (req: any, res: Response) => {
     const company = await Company.findByPk(companyId, { transaction });
     const user = await User.findByPk(userId, { transaction });
     const formType = await FormType.findByPk(form_type_id, { transaction });
-    const currentProject = await Project.findByPk(project_id, { transaction });
-    const allFormType = await FormType.findAll();
-    const formsCount = await Form.findAll(
+    const formsCount = await Form.count(
       {
         where: {
           user_id: userId,
@@ -376,12 +374,6 @@ export const formSubmission = async (req: any, res: Response) => {
         transaction
       }
     )
-
-    const completedIds = []
-
-    for (let i = 0; i < formsCount.length; i++) {
-      completedIds.push(formsCount[i].form_type_id)
-    }
 
     let additionalPoint = 0;
 
@@ -458,12 +450,12 @@ export const formSubmission = async (req: any, res: Response) => {
     if (formType) {
       if (formType.form_type_id !== 6) {
         if (user?.user_type === 'T2') {
-          if (formsCount.length === 6) {
+          if (formsCount === 6) {
             additionalPoint += 200
             isProjectFormCompleted = true;
           }
         } else if (user?.user_type === 'T1') {
-          if (formsCount.length === 4) {
+          if (formsCount === 4) {
             additionalPoint += 200
             isProjectFormCompleted = true;
           }
@@ -471,33 +463,8 @@ export const formSubmission = async (req: any, res: Response) => {
       }
     }
 
-    let partialCompleted = currentProject?.partial_complete_form_type_id;
-
-    if (partialCompleted === null || partialCompleted === undefined) partialCompleted = [];
-
-    if (Number(form_type_id) > 0 && Number(form_type_id) < 6) {
-      for (let i = Number(form_type_id) - 1; i > 0; i--) {
-        const id = i;
-        const index = i - 1;
-        if (!currentProject?.partial_complete_form_type_id?.includes(id) && !completedIds.includes(id)) {
-          partialCompleted = [...partialCompleted, id];
-          additionalPoint += allFormType[index].point_reward / 2
-        }
-      }
-    }
-
-    if (currentProject && formType?.form_type_id !== 6) {
-      partialCompleted = [...new Set(partialCompleted)]
-      currentProject.partial_complete_form_type_id = partialCompleted;
-      // await currentProject.save({ transaction });
-    }
-
     if (user && formType && formType?.form_type_id !== 6) {
       let point_reward = formType.point_reward;
-
-      if (partialCompleted.includes(formType.form_type_id) && !completedIds.includes(formType.form_type_id)) {
-        point_reward /= 2;
-      }
 
       if (formType.form_type_id === 3) {
         point_reward = pic_done ? point_reward : point_reward / 2
@@ -510,10 +477,6 @@ export const formSubmission = async (req: any, res: Response) => {
 
     if (company && formType && formType?.form_type_id !== 6) {
       let point_reward = formType.point_reward;
-
-      if (partialCompleted.includes(formType.form_type_id) && !completedIds.includes(formType.form_type_id)) {
-        point_reward /= 2;
-      }
 
       if (formType.form_type_id === 3) {
         point_reward = pic_done ? point_reward : point_reward / 2
