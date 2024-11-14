@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 
 import { Company } from '../../models/Company';
 import { User } from '../../models/User';
@@ -80,7 +81,7 @@ export const getProjectList = async (req: Request, res: Response) => {
         include: [
           {
             model: Form,
-            where: { status: 'approved' },
+            where: { status: { [Op.or]: ['approved', 'submitted'] } },
             include: [
               {
                 model: FormType, // Nested include to get each User's Profile

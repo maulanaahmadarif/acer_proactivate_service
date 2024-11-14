@@ -62,9 +62,9 @@ export class Form extends Model<FormAttributes, FormCreationAttributes> {
 
   @AllowNull(false)
   @Default('approved')
-  @IsIn([['pending', 'approved', 'rejected']])
+  @IsIn([['pending', 'approved', 'rejected', 'submitted']])
   @Column(DataType.STRING(50))
-  public status!: 'pending' | 'approved' | 'rejected';
+  public status!: 'pending' | 'approved' | 'rejected' | 'submitted';
 
   @AllowNull(true)
   @Column(DataType.JSONB)

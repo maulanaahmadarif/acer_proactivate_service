@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 
 import { FormType } from '../../models/FormType';
 import { Form } from '../../models/Form';
@@ -9,9 +10,158 @@ import { logAction } from '../middleware/log';
 import { UserAction } from '../../models/UserAction';
 import { Project } from '../../models/Project';
 
+export const approveForm = async (req: Request, res: Response) => {
+  const form_id = req.params.form_id;
+  const product_quantity = Number(req.body.product_quantity) || 0;
+
+  try {
+    if (form_id) {
+      const [numOfAffectedRows, updatedForms] = await Form.update(
+        { status: 'approved' },
+        { where: { form_id }, returning: true }
+      )
+
+      if (numOfAffectedRows > 0) {
+        const updatedForm = updatedForms[0]; // Access the first updated record
+        let additionalPoint = 0;
+
+        const user = await User.findByPk(updatedForm.user_id);
+        const company = await Company.findByPk(user?.company_id);
+        const formType = await FormType.findByPk(updatedForm.form_type_id);
+        const formsCount = await Form.count(
+          {
+            where: {
+              user_id: user?.user_id,
+              project_id: updatedForm.project_id,
+              status: 'approved'
+            },
+          }
+        )
+        
+        if (updatedForm.form_type_id === 1) {
+          if (product_quantity >= 1 && product_quantity <= 50) {
+            additionalPoint = 10
+          } else if (product_quantity > 50 && product_quantity <= 300) {
+            additionalPoint = 20
+          } else if (product_quantity > 300) {
+            additionalPoint = 40
+          }
+        } else if (updatedForm.form_type_id === 4) {
+          if (product_quantity >= 1 && product_quantity <= 50) {
+            additionalPoint = 20
+          } else if (product_quantity > 50 && product_quantity <= 300) {
+            additionalPoint = 50
+          } else if (product_quantity > 300) {
+            additionalPoint = 100
+          }
+        } else if (updatedForm.form_type_id === 5) {
+          if (product_quantity >= 1 && product_quantity <= 50) {
+            additionalPoint = 50
+          } else if (product_quantity > 50 && product_quantity <= 300) {
+            additionalPoint = 100
+          } else if (product_quantity > 300) {
+            additionalPoint = 200
+          }
+        } else if (updatedForm.form_type_id === 6) {
+          if (product_quantity >= 1 && product_quantity <= 50) {
+            additionalPoint = 100
+          } else if (product_quantity > 50 && product_quantity <= 300) {
+            additionalPoint = 200
+          } else if (product_quantity > 300) {
+            additionalPoint = 400
+          }
+        } else if (updatedForm.form_type_id === 7) {
+          if (product_quantity >= 1 && product_quantity <= 50) {
+            additionalPoint = 5
+          } else if (product_quantity > 50 && product_quantity <= 300) {
+            additionalPoint = 10
+          } else if (product_quantity > 300) {
+            additionalPoint = 20
+          }
+        } else if (updatedForm.form_type_id === 8) {
+          if (product_quantity >= 1 && product_quantity <= 50) {
+            additionalPoint = 10
+          } else if (product_quantity > 50 && product_quantity <= 300) {
+            additionalPoint = 25
+          } else if (product_quantity > 300) {
+            additionalPoint = 50
+          }
+        } else if (updatedForm.form_type_id === 9) {
+          if (product_quantity >= 1 && product_quantity <= 50) {
+            additionalPoint = 25
+          } else if (product_quantity > 50 && product_quantity <= 300) {
+            additionalPoint = 50
+          } else if (product_quantity > 300) {
+            additionalPoint = 100
+          }
+        } else if (updatedForm.form_type_id === 10) {
+          if (product_quantity >= 1 && product_quantity <= 50) {
+            additionalPoint = 50
+          } else if (product_quantity > 50 && product_quantity <= 300) {
+            additionalPoint = 100
+          } else if (product_quantity > 300) {
+            additionalPoint = 200
+          }
+        }
+
+        if (user?.user_type === 'T2') {
+          if (formsCount === 5) {
+            additionalPoint += 200
+          }
+        } else if (user?.user_type === 'T1') {
+          if (formsCount === 3) {
+            additionalPoint += 200
+          }
+        }
+
+        if (user && formType) {
+          user.total_points = (user.total_points || 0) + formType.point_reward + additionalPoint; // Assuming `points` field exists on User
+          user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint;
+          await user.save();
+        }
+    
+        if (company && formType) {
+          company.total_points = (company.total_points || 0) + formType.point_reward + additionalPoint; // Assuming `points` field exists on User
+          await company.save();
+        }
+    
+        // await logAction(userId, req.method, 1, 'FORM', req.ip, req.get('User-Agent'));
+    
+        await UserAction.create({
+          user_id: user!.user_id,
+          entity_type: 'FORM',
+          action_type: req.method,
+          form_id: Number(form_id),
+          // ip_address: req.ip,
+          // user_agent: req.get('User-Agent'),
+        });
+
+      } else {
+        res.status(400).json({ message: 'No record found with the specified form_id.', status: res.status });
+      }
+      
+      res.status(200).json({ message: 'Form approved', status: res.status });
+    } else {
+      res.status(400).json({ message: 'Form failed to approve', status: res.status });
+    }
+  } catch (error: any) {
+    console.error('Error creating form type:', error);
+
+    // Handle validation errors from Sequelize
+    if (error.name === 'SequelizeValidationError') {
+      const messages = error.errors.map((err: any) => err.message);
+      return res.status(400).json({ message: 'Validation error', errors: messages });
+    }
+
+    // Handle other types of errors
+    res.status(500).json({ message: 'Something went wrong', error });
+  }
+};
+
 export const deleteForm = async (req: Request, res: Response) => {
   const form_id = req.params.form_id;
   const product_quantity = Number(req.query.product_quantity) || 0;
+  const poc_done = req.query.poc_done || false;
 
   try {
     if (form_id) {
@@ -105,22 +255,33 @@ export const deleteForm = async (req: Request, res: Response) => {
 
         if (user?.user_type === 'T2') {
           if (formsCount === 5) {
-            removedPoint += 200
+            removedPoint -= 200
           }
         } else if (user?.user_type === 'T1') {
           if (formsCount === 3) {
-            removedPoint += 200
+            removedPoint -= 200
           }
         }
 
         if (user && formType) {
-          user.total_points = (user.total_points || 0) - formType.point_reward - removedPoint; // Assuming `points` field exists on User
+          let point_reward = formType.point_reward;
+
+          if (formType.form_type_id === 3) {
+            point_reward = poc_done ? point_reward : point_reward / 2
+          }
+
+          user.total_points = (user.total_points || 0) - point_reward - removedPoint; // Assuming `points` field exists on User
           user.accomplishment_total_points = (user.accomplishment_total_points || 0) - formType.point_reward - removedPoint;
           await user.save();
         }
     
         if (company && formType) {
-          company.total_points = (company.total_points || 0) - formType.point_reward - removedPoint; // Assuming `points` field exists on User
+          let point_reward = formType.point_reward;
+
+          if (formType.form_type_id === 3) {
+            point_reward = poc_done ? point_reward : point_reward / 2
+          }
+          company.total_points = (company.total_points || 0) - point_reward - removedPoint; // Assuming `points` field exists on User
           await company.save();
         }
     
@@ -196,7 +357,7 @@ export const formSubmission = async (req: any, res: Response) => {
       form_type_id,
       form_data,
       project_id,
-      status: 'approved'
+      status: Number(form_type_id) === 6 ? 'submitted' : 'approved'
     })
 
     // Update user points based on the form submission
@@ -249,15 +410,17 @@ export const formSubmission = async (req: any, res: Response) => {
         } else if (product_quantity > 300) {
           additionalPoint = 200
         }
-      } else if (formType.form_type_id === 6) {
-        if (product_quantity >= 1 && product_quantity <= 50) {
-          additionalPoint = 100
-        } else if (product_quantity > 50 && product_quantity <= 300) {
-          additionalPoint = 200
-        } else if (product_quantity > 300) {
-          additionalPoint = 400
-        }
-      } else if (formType.form_type_id === 7) {
+      }
+      // else if (formType.form_type_id === 6) {
+      //   if (product_quantity >= 1 && product_quantity <= 50) {
+      //     additionalPoint = 100
+      //   } else if (product_quantity > 50 && product_quantity <= 300) {
+      //     additionalPoint = 200
+      //   } else if (product_quantity > 300) {
+      //     additionalPoint = 400
+      //   }
+      // }
+      else if (formType.form_type_id === 7) {
         if (product_quantity >= 1 && product_quantity <= 50) {
           additionalPoint = 5
         } else if (product_quantity > 50 && product_quantity <= 300) {
@@ -292,16 +455,19 @@ export const formSubmission = async (req: any, res: Response) => {
       }
     }
 
-  
-    if (user?.user_type === 'T2') {
-      if (formsCount.length === 6) {
-        additionalPoint += 200
-        isProjectFormCompleted = true;
-      }
-    } else if (user?.user_type === 'T1') {
-      if (formsCount.length === 4) {
-        additionalPoint += 200
-        isProjectFormCompleted = true;
+    if (formType) {
+      if (formType.form_type_id !== 6) {
+        if (user?.user_type === 'T2') {
+          if (formsCount.length === 6) {
+            additionalPoint += 200
+            isProjectFormCompleted = true;
+          }
+        } else if (user?.user_type === 'T1') {
+          if (formsCount.length === 4) {
+            additionalPoint += 200
+            isProjectFormCompleted = true;
+          }
+        }
       }
     }
 
@@ -313,20 +479,20 @@ export const formSubmission = async (req: any, res: Response) => {
       for (let i = Number(form_type_id) - 1; i > 0; i--) {
         const id = i;
         const index = i - 1;
-        if (!currentProject?.partial_complete_form_type_id?.includes(index) && !completedIds.includes(id)) {
+        if (!currentProject?.partial_complete_form_type_id?.includes(id) && !completedIds.includes(id)) {
           partialCompleted = [...partialCompleted, id];
           additionalPoint += allFormType[index].point_reward / 2
         }
       }
     }
 
-    if (currentProject) {
+    if (currentProject && formType?.form_type_id !== 6) {
       partialCompleted = [...new Set(partialCompleted)]
       currentProject.partial_complete_form_type_id = partialCompleted;
-      await currentProject.save({ transaction });
+      // await currentProject.save({ transaction });
     }
 
-    if (user && formType) {
+    if (user && formType && formType?.form_type_id !== 6) {
       let point_reward = formType.point_reward;
 
       if (partialCompleted.includes(formType.form_type_id) && !completedIds.includes(formType.form_type_id)) {
@@ -337,13 +503,12 @@ export const formSubmission = async (req: any, res: Response) => {
         point_reward = pic_done ? point_reward : point_reward / 2
       }
 
-      console.log('point_reward ', point_reward);
       user.total_points = (user.total_points || 0) + point_reward + additionalPoint; // Assuming `points` field exists on User
       user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint;
       await user.save({ transaction });
     }
 
-    if (company && formType) {
+    if (company && formType && formType?.form_type_id !== 6) {
       let point_reward = formType.point_reward;
 
       if (partialCompleted.includes(formType.form_type_id) && !completedIds.includes(formType.form_type_id)) {
@@ -362,7 +527,7 @@ export const formSubmission = async (req: any, res: Response) => {
     await UserAction.create({
       user_id: userId,
       entity_type: 'FORM',
-      action_type: req.method,
+      action_type: formType?.form_type_id === 6 ? 'SUBMITTED' : req.method,
       form_id: submission.form_id,
       // ip_address: req.ip,
       // user_agent: req.get('User-Agent'),
@@ -396,7 +561,9 @@ export const getFormByProject = async (req: any, res: Response) => {
         where: {
           user_id: userId,
           project_id: projectId,
-          status: 'approved'
+          status: {
+            [Op.or]: ['approved', 'submitted']
+          }
         }
       }
     )
