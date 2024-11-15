@@ -9,6 +9,7 @@ import { sequelize } from '../db';
 import { logAction } from '../middleware/log';
 import { UserAction } from '../../models/UserAction';
 import { Project } from '../../models/Project';
+import dayjs from 'dayjs';
 
 export const approveForm = async (req: Request, res: Response) => {
   const form_id = req.params.form_id;
@@ -253,6 +254,7 @@ export const deleteForm = async (req: Request, res: Response) => {
           }
         }
 
+        // ! CHECK IF ONE OF FORM SUBMITTED BEFORE 14 DECEMBER 2024
         if (user?.user_type === 'T2') {
           if (formsCount === 5) {
             removedPoint -= 200
@@ -447,8 +449,13 @@ export const formSubmission = async (req: any, res: Response) => {
       }
     }
 
+    const currentDate = dayjs();
+
+    // Define the target comparison date
+    const targetDate = dayjs('2024-12-14');
+
     if (formType) {
-      if (formType.form_type_id !== 6) {
+      if (formType.form_type_id !== 6 && currentDate.isBefore(targetDate, 'day')) {
         if (user?.user_type === 'T2') {
           if (formsCount === 6) {
             additionalPoint += 200
