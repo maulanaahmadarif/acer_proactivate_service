@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
+import dayjs from 'dayjs';
+import fs from 'fs';
+import path from 'path';
 
 import { FormType } from '../../models/FormType';
 import { Form } from '../../models/Form';
@@ -9,7 +12,7 @@ import { sequelize } from '../db';
 import { logAction } from '../middleware/log';
 import { UserAction } from '../../models/UserAction';
 import { Project } from '../../models/Project';
-import dayjs from 'dayjs';
+import { sendEmail } from '../services/mail';
 
 export const approveForm = async (req: Request, res: Response) => {
   const form_id = req.params.form_id;
@@ -163,11 +166,12 @@ export const deleteForm = async (req: Request, res: Response) => {
   const form_id = req.params.form_id;
   const product_quantity = Number(req.query.product_quantity) || 0;
   const poc_done = req.query.poc_done || false;
+  const reason = req.query.reason as string
 
   try {
     if (form_id) {
       const [numOfAffectedRows, updatedForms] = await Form.update(
-        { status: 'rejected' },
+        { status: 'rejected', note: reason },
         { where: { form_id }, returning: true }
       )
 
@@ -212,15 +216,17 @@ export const deleteForm = async (req: Request, res: Response) => {
           } else if (product_quantity > 300) {
             removedPoint = 200
           }
-        } else if (updatedForm.form_type_id === 6) {
-          if (product_quantity >= 1 && product_quantity <= 50) {
-            removedPoint = 100
-          } else if (product_quantity > 50 && product_quantity <= 300) {
-            removedPoint = 200
-          } else if (product_quantity > 300) {
-            removedPoint = 400
-          }
-        } else if (updatedForm.form_type_id === 7) {
+        }
+        // else if (updatedForm.form_type_id === 6) {
+        //   if (product_quantity >= 1 && product_quantity <= 50) {
+        //     removedPoint = 100
+        //   } else if (product_quantity > 50 && product_quantity <= 300) {
+        //     removedPoint = 200
+        //   } else if (product_quantity > 300) {
+        //     removedPoint = 400
+        //   }
+        // }
+        else if (updatedForm.form_type_id === 7) {
           if (product_quantity >= 1 && product_quantity <= 50) {
             removedPoint = 5
           } else if (product_quantity > 50 && product_quantity <= 300) {
@@ -294,9 +300,18 @@ export const deleteForm = async (req: Request, res: Response) => {
           entity_type: 'FORM',
           action_type: req.method,
           form_id: Number(form_id),
+          note: reason,
           // ip_address: req.ip,
           // user_agent: req.get('User-Agent'),
         });
+
+        let htmlTemplate = fs.readFileSync(path.join(process.cwd(), 'src', 'templates', 'rejectEmail.html'), 'utf-8');
+
+        htmlTemplate = htmlTemplate
+          .replace('{{username}}', user!.username)
+          .replace('{{reason}}', reason)
+
+        await sendEmail({ to: user!.email, subject: 'Your Submission is Rejected!', html: htmlTemplate });
 
       } else {
         res.status(400).json({ message: 'No record found with the specified form_id.', status: res.status });

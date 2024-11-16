@@ -101,17 +101,6 @@ export const addInternalUser = async (req: Request, res: Response) => {
 }
 
 export const userSignup = async (req: Request, res: Response) => {
-  let bonusSignupPoint = 0;
-
-  const currentDate = dayjs();
-
-  // Define the target comparison date
-  const targetDate = dayjs('2024-11-23');
-
-  if (currentDate.isBefore(targetDate, 'day')) {
-    bonusSignupPoint = 400;
-  }
-
   try {
     const {
       email,
@@ -121,6 +110,7 @@ export const userSignup = async (req: Request, res: Response) => {
       phone_number,
       job_title,
       company_id,
+      user_type,
       fullname,
       custom_company
     } = req.body
@@ -134,7 +124,7 @@ export const userSignup = async (req: Request, res: Response) => {
     let normalize_program_saled_id = program_saled_id;
 
     if (!company_id) {
-      const customCompany = await Company.create({ name: custom_company, industry: 'Custom Company' })
+      const customCompany = await Company.create({ name: custom_company, industry: 'Custom Company', total_points: 0 })
       normalize_company_id = customCompany.company_id;
       normalize_program_saled_id = `${program_saled_id}-0${customCompany.company_id}`
     }
@@ -149,12 +139,13 @@ export const userSignup = async (req: Request, res: Response) => {
       program_saled_id: normalize_program_saled_id,
       phone_number,
       job_title,
-      total_points: bonusSignupPoint,
-      accomplishment_total_points: bonusSignupPoint,
+      total_points: 0,
+      accomplishment_total_points: 0,
       fullname,
       token,
       token_purpose: 'EMAIL_CONFIRMATION',
-      token_expiration: new Date(Date.now() + 3600000),
+      // token_expiration: new Date(Date.now() + 3600000),
+      token_expiration: new Date(Date.now() + 24 * 60 * 60 * 1000), // ONE DAY
     });
 
     const userProfile = {
@@ -171,7 +162,7 @@ export const userSignup = async (req: Request, res: Response) => {
     const company = await Company.findByPk(company_id);
 
     if (company) {
-      company.total_points = company.total_points as number + bonusSignupPoint;
+      company.total_points = company.total_points as number + 0;
       await company.save();
     }
 
@@ -181,7 +172,7 @@ export const userSignup = async (req: Request, res: Response) => {
       .replace('{{userName}}', user.username)
       .replace('{{confirmationLink}}', `${process.env.APP_URL}/email-confirmation?token=${token}`)
 
-    await sendEmail({ to: user.email, bcc: process.env.EMAIL_BCC, subject: 'Welcome to Acer ProActivate Program', html: htmlTemplate });
+    await sendEmail({ to: user.email, bcc: process.env.EMAIL_BCC, subject: 'Email Confirmation - Acer ProActivate Program', html: htmlTemplate });
 
     // Return the created user
     res.status(200).json({ user: userProfile });
@@ -247,7 +238,7 @@ export const getUserList = async (req: Request, res: Response) => {
   try {
     const { company_id } = req.query;
 
-    const whereCondition: any = { level: 'CUSTOMER' };
+    const whereCondition: any = { level: 'CUSTOMER', is_active: true };
 
     if (company_id) {
       whereCondition.company_id = company_id;
@@ -309,6 +300,17 @@ export const forgotPassword = async (req: Request, res: Response) => {
 export const userSignupConfirmation = async (req: Request, res: Response) => {
   const { token } = req.params;
 
+  let bonusSignupPoint = 0;
+
+  const currentDate = dayjs();
+
+  // Define the target comparison date
+  const targetDate = dayjs('2024-11-23');
+
+  if (currentDate.isBefore(targetDate, 'day')) {
+    bonusSignupPoint = 400;
+  }
+
   try {
     const user = await User.findOne({
       where: {
@@ -328,7 +330,16 @@ export const userSignupConfirmation = async (req: Request, res: Response) => {
     user.token = null as any;
     user.token_purpose = null as any;
     user.token_expiration = null as any;
+    user.total_points = bonusSignupPoint;
+    user.accomplishment_total_points = bonusSignupPoint;
     await user.save();
+
+    const company = await Company.findByPk(user.company_id);
+
+    if (company) {
+      company.total_points = company.total_points as number + bonusSignupPoint;
+      await company.save();
+    }
 
     let htmlTemplate = fs.readFileSync(path.join(process.cwd(), 'src', 'templates', 'welcomeEmail.html'), 'utf-8');
 
@@ -401,5 +412,39 @@ export const updateUser = async (req: any, res: Response) => {
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ message: 'Something went wrong' });
+  }
+}
+
+export const deleteUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.user_id;
+    const user = await User.findByPk(userId)
+
+    if (user) {
+      const company = await Company.findByPk(user.company_id)
+      if (company) {
+        company.total_points = (company.total_points || 0) - (user.accomplishment_total_points || 0)
+        await company.save();
+      }
+      user.is_active = false;
+      user.total_points = 0;
+      user.accomplishment_total_points = 0;
+      await user.save();
+      res.status(200).json({ message: 'User deleted', status: res.status });
+      return;
+    } else {
+      return res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error: any) {
+    console.error('Error delete user:', error);
+
+    // Handle validation errors from Sequelize
+    if (error.name === 'SequelizeValidationError') {
+      const messages = error.errors.map((err: any) => err.message);
+      return res.status(400).json({ message: 'Validation error', errors: messages });
+    }
+
+    // Handle other types of errors
+    res.status(500).json({ message: 'Something went wrong', error });
   }
 }

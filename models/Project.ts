@@ -10,7 +10,8 @@ import {
   PrimaryKey,
   AutoIncrement,
   CreatedAt,
-  UpdatedAt
+  UpdatedAt,
+  Unique
 } from 'sequelize-typescript';
 import { Optional } from "sequelize";
 
@@ -21,8 +22,7 @@ export interface ProjectAttributes {
   project_id?: number;
   name: string;
   description?: string;
-  user_id?: number;
-  partial_complete_form_type_id?: number[];
+  user_id: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -38,6 +38,7 @@ export class Project extends Model<ProjectAttributes, ProjectCreationAttributes>
   public project_id!: number;
 
   @AllowNull(false)
+  @Unique
   @Column(DataType.STRING(255))
   public name!: string;
 
@@ -49,10 +50,6 @@ export class Project extends Model<ProjectAttributes, ProjectCreationAttributes>
   @AllowNull(false)
   @Column(DataType.INTEGER)
   user_id!: number;
-
-  @AllowNull(true)
-  @Column(DataType.ARRAY(DataType.INTEGER))
-  public partial_complete_form_type_id?: number[];
 
   // Timestamps
   @CreatedAt
