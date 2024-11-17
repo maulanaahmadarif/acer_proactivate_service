@@ -72,7 +72,7 @@ export const redeemPoint = async (req: CustomRequest, res: Response) => {
       .replace('{{accomplishmentScore}}', String(user?.accomplishment_total_points ?? 'N/A'))
       .replace('{{currentScore}}', String(user?.total_points ?? 'N/A'));
 
-    await sendEmail({ to: email, subject: 'Lenovo Go Pro Redemption Notification', html: htmlTemplate });
+    await sendEmail({ to: email, subject: 'Acer ProActivate Redemption Notification', html: htmlTemplate });
 
     res.status(200).json({ message: 'Success redeem', status: res.status });
   } catch (error: any) {
