@@ -123,7 +123,7 @@ export const approveForm = async (req: Request, res: Response) => {
         }
 
         if (user?.user_type === 'T2') {
-          if (formsCount.length === 6) {
+          if (formsCount.length === 6 || (completedFormTypeIds.includes(1) && completedFormTypeIds.includes(5) && completedFormTypeIds.includes(6))) {
             additionalPoint += 200
           }
         } else if (user?.user_type === 'T1') {
@@ -153,6 +153,14 @@ export const approveForm = async (req: Request, res: Response) => {
           // ip_address: req.ip,
           // user_agent: req.get('User-Agent'),
         });
+
+        let htmlTemplate = fs.readFileSync(path.join(process.cwd(), 'src', 'templates', 'approveEmail.html'), 'utf-8');
+        let subjectEmail = 'Congratulations! Your Milestone 6 is Approved'
+
+        htmlTemplate = htmlTemplate
+          .replace('{{username}}', user!.username)
+
+        await sendEmail({ to: user!.email, subject: subjectEmail, html: htmlTemplate });
 
       } else {
         res.status(400).json({ message: 'No record found with the specified form_id.', status: res.status });
@@ -320,12 +328,18 @@ export const deleteForm = async (req: Request, res: Response) => {
         });
 
         let htmlTemplate = fs.readFileSync(path.join(process.cwd(), 'src', 'templates', 'rejectEmail.html'), 'utf-8');
+        let subjectEmail = 'Your Submission is Rejected!'
+
+        if (formType?.form_type_id === 6) {
+          htmlTemplate = fs.readFileSync(path.join(process.cwd(), 'src', 'templates', 'rejectEmail6.html'), 'utf-8');
+          subjectEmail = 'Your Submission on Milestone 6 is Rejected!'
+        }
 
         htmlTemplate = htmlTemplate
           .replace('{{username}}', user!.username)
           .replace('{{reason}}', reason)
 
-        await sendEmail({ to: user!.email, subject: 'Your Submission is Rejected!', html: htmlTemplate });
+        await sendEmail({ to: user!.email, subject: subjectEmail, html: htmlTemplate });
 
       } else {
         res.status(400).json({ message: 'No record found with the specified form_id.', status: res.status });
