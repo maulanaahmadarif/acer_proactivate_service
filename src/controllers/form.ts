@@ -32,7 +32,8 @@ export const approveForm = async (req: Request, res: Response) => {
         const user = await User.findByPk(updatedForm.user_id);
         const company = await Company.findByPk(user?.company_id);
         const formType = await FormType.findByPk(updatedForm.form_type_id);
-        const formsCount = await Form.count(
+        const allFormType = await FormType.findAll();
+        const formsCount = await Form.findAll(
           {
             where: {
               user_id: user?.user_id,
@@ -41,6 +42,19 @@ export const approveForm = async (req: Request, res: Response) => {
             },
           }
         )
+
+        const completedFormTypeIds = formsCount.map(item => item.form_type_id);
+        let bonusPoint = 0;
+
+        if (completedFormTypeIds.includes(5) && completedFormTypeIds.includes(6)) {
+          let counter = 4;
+          while (counter >= 1) {
+            if (!completedFormTypeIds.includes(counter)) {
+              bonusPoint += (allFormType[counter - 1].point_reward / 2)
+            }
+            counter--
+          }
+        }
         
         if (updatedForm.form_type_id === 1) {
           if (product_quantity >= 1 && product_quantity <= 50) {
@@ -109,23 +123,23 @@ export const approveForm = async (req: Request, res: Response) => {
         }
 
         if (user?.user_type === 'T2') {
-          if (formsCount === 5) {
+          if (formsCount.length === 6) {
             additionalPoint += 200
           }
         } else if (user?.user_type === 'T1') {
-          if (formsCount === 3) {
+          if (formsCount.length === 4) {
             additionalPoint += 200
           }
         }
 
         if (user && formType) {
-          user.total_points = (user.total_points || 0) + formType.point_reward + additionalPoint; // Assuming `points` field exists on User
-          user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint;
+          user.total_points = (user.total_points || 0) + formType.point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
+          user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint + bonusPoint;
           await user.save();
         }
     
         if (company && formType) {
-          company.total_points = (company.total_points || 0) + formType.point_reward + additionalPoint; // Assuming `points` field exists on User
+          company.total_points = (company.total_points || 0) + formType.point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
           await company.save();
         }
     
@@ -381,7 +395,8 @@ export const formSubmission = async (req: any, res: Response) => {
     const company = await Company.findByPk(companyId, { transaction });
     const user = await User.findByPk(userId, { transaction });
     const formType = await FormType.findByPk(form_type_id, { transaction });
-    const formsCount = await Form.count(
+    const allFormType = await FormType.findAll();
+    const formsCount = await Form.findAll(
       {
         where: {
           user_id: userId,
@@ -392,7 +407,20 @@ export const formSubmission = async (req: any, res: Response) => {
       }
     )
 
+    const completedFormTypeIds = formsCount.map(item => item.form_type_id);
+
     let additionalPoint = 0;
+    let bonusPoint = 0;
+
+    if (form_type_id !== 1 && completedFormTypeIds.includes(5) && completedFormTypeIds.includes(6)) {
+      let counter = 4;
+      while (counter >= 1) {
+        if (!completedFormTypeIds.includes(counter)) {
+          bonusPoint += (allFormType[counter - 1].point_reward / 2)
+        }
+        counter--
+      }
+    }
 
     if (formType) {
       if (formType.form_type_id === 1) {
@@ -472,12 +500,12 @@ export const formSubmission = async (req: any, res: Response) => {
     if (formType) {
       if (formType.form_type_id !== 6 && currentDate.isBefore(targetDate, 'day')) {
         if (user?.user_type === 'T2') {
-          if (formsCount === 6) {
+          if (formsCount.length === 6) {
             additionalPoint += 200
             isProjectFormCompleted = true;
           }
         } else if (user?.user_type === 'T1') {
-          if (formsCount === 4) {
+          if (formsCount.length === 4) {
             additionalPoint += 200
             isProjectFormCompleted = true;
           }
@@ -492,8 +520,8 @@ export const formSubmission = async (req: any, res: Response) => {
         point_reward = pic_done ? point_reward : point_reward / 2
       }
 
-      user.total_points = (user.total_points || 0) + point_reward + additionalPoint; // Assuming `points` field exists on User
-      user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint;
+      user.total_points = (user.total_points || 0) + point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
+      user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint + bonusPoint;
       await user.save({ transaction });
     }
 
@@ -503,7 +531,7 @@ export const formSubmission = async (req: any, res: Response) => {
       if (formType.form_type_id === 3) {
         point_reward = pic_done ? point_reward : point_reward / 2
       }
-      company.total_points = (company.total_points || 0) + point_reward + additionalPoint; // Assuming `points` field exists on User
+      company.total_points = (company.total_points || 0) + point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
       await company.save({ transaction });
     }
 

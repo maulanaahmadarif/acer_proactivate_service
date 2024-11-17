@@ -33,7 +33,7 @@ export const getProgramDetail = async (req: Request, res: Response) => {
     const totalAccomplishmentPoint = await User.sum('accomplishment_total_points', { where: { level: 'CUSTOMER' } })
     const totalCompanyPoint = await Company.sum('total_points')
     const totalFormSubmission = await Form.count({
-      where: { status: 'approved' },
+      where: { status: { [Op.or]: ['approved', 'submitted'] } },
       include: [
         {
           model: User,
