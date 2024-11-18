@@ -589,9 +589,10 @@ export const getFormByProject = async (req: any, res: Response) => {
           user_id: userId,
           project_id: projectId,
           status: {
-            [Op.or]: ['approved', 'submitted']
+            [Op.or]: ['approved', 'submitted', 'rejected']
           }
-        }
+        },
+        order: [['created_at', 'DESC']],
       }
     )
 
