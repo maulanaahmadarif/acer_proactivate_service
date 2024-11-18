@@ -38,7 +38,6 @@ export class Project extends Model<ProjectAttributes, ProjectCreationAttributes>
   public project_id!: number;
 
   @AllowNull(false)
-  @Unique
   @Column(DataType.STRING(255))
   public name!: string;
 
