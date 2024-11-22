@@ -154,12 +154,12 @@ export const getAllDataDownload = async (req: Request, res: Response) => {
           include: [
             {
               model: Project,  // Include related Forms
-              attributes: ['name'],
+              attributes: ['name', 'createdAt'],
               include: [
                 {
                   model: Form,
                   where: { status: { [Op.or]: ['approved', 'submitted'] } },
-                  attributes: ['form_data', 'status'],
+                  attributes: ['form_data', 'status', 'createdAt'],
                   required: true,
                   include: [
                     {
@@ -268,7 +268,7 @@ export const getAllDataDownload = async (req: Request, res: Response) => {
           accomplishment_point: user.accomplishment_total_points,
           phone: user.phone_number,
           project_name: user?.project[0]?.name,
-          created_at: dayjs(user?.project[0]?.createdAt).format('DD MMM YYYY HH:mm'),
+          created_at: user?.project[0]?.createdAt ? dayjs(user?.project[0]?.createdAt).format('DD MMM YYYY HH:mm') : '',
           milestone1: milestones[0],
           milestone2: milestones[1],
           milestone3: milestones[2],

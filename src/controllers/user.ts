@@ -242,6 +242,7 @@ export const getUserList = async (req: Request, res: Response) => {
 
     if (company_id) {
       whereCondition.company_id = company_id;
+      delete whereCondition.is_active;
     }
 
     const sortField: string = (req.query.sortBy as string) || 'total_points';
