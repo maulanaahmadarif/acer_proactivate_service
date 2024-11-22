@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Model, Sequelize } from 'sequelize';
+import { Model, Sequelize, where } from 'sequelize';
 import ExcelJS from 'exceljs'
 import { Op } from 'sequelize';
 
@@ -8,7 +8,8 @@ import { User } from '../../models/User';
 import { Form } from '../../models/Form';
 import { Project } from '../../models/Project';
 import { FormType } from '../../models/FormType';
-import { formatJsonToLabelValueString } from '../utils';
+import { formatJsonToLabelValueString, getUserType } from '../utils';
+import dayjs from 'dayjs';
 
 export const getProgramDetail = async (req: Request, res: Response) => {
   try {
@@ -31,8 +32,8 @@ export const getProgramDetail = async (req: Request, res: Response) => {
       col: 'company_id',
     });
     const totalUser = await User.count({ where: { level: 'CUSTOMER', is_active: true } })
-    const totalAccomplishmentPoint = await User.sum('accomplishment_total_points', { where: { level: 'CUSTOMER' } })
-    const totalCompanyPoint = await Company.sum('total_points')
+    const totalAccomplishmentPoint = await User.sum('accomplishment_total_points', { where: { level: 'CUSTOMER', is_active: true } })
+    // const totalCompanyPoint = await Company.sum('total_points', { where: { status: 'active' } })
     const totalFormSubmission = await Form.count({
       where: { status: { [Op.or]: ['approved', 'submitted'] } },
       include: [
@@ -56,7 +57,7 @@ export const getProgramDetail = async (req: Request, res: Response) => {
         total_company: totalCompany,
         total_user: totalUser,
         total_accomplishment_point: totalAccomplishmentPoint,
-        total_company_point: totalCompanyPoint,
+        // total_company_point: totalCompanyPoint,
         total_form_submission : totalFormSubmission,
       }
     });
@@ -197,15 +198,17 @@ export const getAllDataDownload = async (req: Request, res: Response) => {
       const worksheet = workbook.addWorksheet(uniqueSheetName);
 
       worksheet.columns = [
+        { header: 'Company', key: 'company', width: 10 },
         { header: 'Username', key: 'username', width: 10 },
         { header: 'Full Name', key: 'fullname', width: 20 },
         { header: 'Job', key: 'job', width: 30 },
         { header: 'Email', key: 'email', width: 15 },
         { header: 'User Type', key: 'user_type', width: 15 },
         { header: 'Total Point', key: 'total_point', width: 50 },
-        { header: 'Accomplishment Poiny', key: 'accomplishment_point', width: 50 },
+        { header: 'Accomplishment Point', key: 'accomplishment_point', width: 50 },
         { header: 'Phone Number', key: 'phone', width: 50 },
         { header: 'Project', key: 'project_name', width: 50 },
+        { header: 'Date Submission', key: 'created_at', width: 10 },
         { header: 'Milestone 1', key: 'milestone1', width: 50 },
         { header: 'Milestone 2', key: 'milestone2', width: 50 },
         { header: 'Milestone 3', key: 'milestone3', width: 50 },
@@ -228,7 +231,10 @@ export const getAllDataDownload = async (req: Request, res: Response) => {
                   label: item.label,
                   value: item.value
                 }))
-                milestones[i] = formatJsonToLabelValueString(labelValue);
+                milestones[i] = `
+                    Date Submitted Form: ${dayjs(sortedForm[i].createdAt).format('DD MMM YYYY HH:mm')}\n
+                    ${formatJsonToLabelValueString(labelValue)}
+                  `;
               }
             }
           }
@@ -242,21 +248,27 @@ export const getAllDataDownload = async (req: Request, res: Response) => {
                   label: item.label,
                   value: item.value
                 }))
-                milestones[i] = formatJsonToLabelValueString(labelValue);
+                milestones[i] = `
+                    Date Submitted Form: ${dayjs(sortedForm[i].createdAt).format('DD MMM YYYY HH:mm')}\n
+                    ${formatJsonToLabelValueString(labelValue)}
+                  `;
               }
             }
           }
         }
 
         worksheet.addRow({
+          company: item.name,
           username: user.username,
           fullname: user.fullname,
           job: user.job_title,
           email: user.email,
-          user_type: user.user_type,
+          user_type: getUserType(user.user_type),
           total_point: user.total_points,
           accomplishment_point: user.accomplishment_total_points,
+          phone: user.phone_number,
           project_name: user?.project[0]?.name,
+          created_at: dayjs(user?.project[0]?.createdAt).format('DD MMM YYYY HH:mm'),
           milestone1: milestones[0],
           milestone2: milestones[1],
           milestone3: milestones[2],
@@ -277,7 +289,10 @@ export const getAllDataDownload = async (req: Request, res: Response) => {
                     label: item.label,
                     value: item.value
                   }))
-                  milestonesProject[i] = formatJsonToLabelValueString(labelValue);
+                  milestonesProject[i] = `
+                    Date Submitted Form: ${dayjs(sortedForm[i].createdAt).format('DD MMM YYYY HH:mm')}\n
+                    ${formatJsonToLabelValueString(labelValue)}
+                  `;
                 }
               }
             }
@@ -291,7 +306,10 @@ export const getAllDataDownload = async (req: Request, res: Response) => {
                     label: item.label,
                     value: item.value
                   }))
-                  milestonesProject[i] = formatJsonToLabelValueString(labelValue);
+                  milestonesProject[i] = `
+                    Date Submitted Form: ${dayjs(sortedForm[i].createdAt).format('DD MMM YYYY HH:mm')}\n
+                    ${formatJsonToLabelValueString(labelValue)}
+                  `;
                 }
               }
             }
@@ -299,6 +317,7 @@ export const getAllDataDownload = async (req: Request, res: Response) => {
 
           worksheet.addRow({
             project_name: user.project[i].name,
+            created_at: dayjs(user?.project[0]?.createdAt).format('DD MMM YYYY HH:mm'),
             milestone1: milestonesProject[0],
             milestone2: milestonesProject[1],
             milestone3: milestonesProject[2],
