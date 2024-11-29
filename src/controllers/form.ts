@@ -19,6 +19,7 @@ import { formatJsonToLabelValueString, getUserType } from '../utils';
 export const approveForm = async (req: Request, res: Response) => {
   const form_id = req.params.form_id;
   const product_quantity = Number(req.body.product_quantity) || 0;
+  const pic_done = req.body.pic_done || false;
 
   try {
     if (form_id) {
@@ -124,24 +125,42 @@ export const approveForm = async (req: Request, res: Response) => {
           }
         }
 
-        if (user?.user_type === 'T2') {
-          if (formsCount.length === 6 || (completedFormTypeIds.includes(1) && completedFormTypeIds.includes(5) && completedFormTypeIds.includes(6))) {
-            additionalPoint += 200
-          }
-        } else if (user?.user_type === 'T1') {
-          if (formsCount.length === 4) {
-            additionalPoint += 200
+        const currentDate = dayjs();
+        // Define the target comparison date
+        const targetDate = dayjs('2024-12-14');
+
+        if (currentDate.isBefore(targetDate, 'day')) {
+          if (user?.user_type === 'T2') {
+            if (formsCount.length === 6 || (completedFormTypeIds.includes(1) && completedFormTypeIds.includes(5) && completedFormTypeIds.includes(6))) {
+              additionalPoint += 200
+            }
+          } else if (user?.user_type === 'T1') {
+            if (formsCount.length === 4) {
+              additionalPoint += 200
+            }
           }
         }
 
         if (user && formType) {
-          user.total_points = (user.total_points || 0) + formType.point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
-          user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint + bonusPoint;
+          let point_reward = formType.point_reward;
+    
+          if (formType.form_type_id === 3) {
+            point_reward = pic_done ? point_reward : point_reward / 2
+          }
+
+          user.total_points = (user.total_points || 0) + point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
+          user.accomplishment_total_points = (user.accomplishment_total_points || 0) + point_reward + additionalPoint + bonusPoint;
           await user.save();
         }
     
         if (company && formType) {
-          company.total_points = (company.total_points || 0) + formType.point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
+          let point_reward = formType.point_reward;
+    
+          if (formType.form_type_id === 3) {
+            point_reward = pic_done ? point_reward : point_reward / 2
+          }
+
+          company.total_points = (company.total_points || 0) + point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
           await company.save();
         }
     
@@ -188,8 +207,6 @@ export const approveForm = async (req: Request, res: Response) => {
 
 export const deleteForm = async (req: Request, res: Response) => {
   const form_id = req.params.form_id;
-  const product_quantity = Number(req.query.product_quantity) || 0;
-  const poc_done = req.query.poc_done || false;
   const reason = req.query.reason as string
 
   try {
@@ -201,124 +218,11 @@ export const deleteForm = async (req: Request, res: Response) => {
 
       if (numOfAffectedRows > 0) {
         const updatedForm = updatedForms[0]; // Access the first updated record
-        let removedPoint = 0;
-        let removedCompletedPoint = 0;
 
         const user = await User.findByPk(updatedForm.user_id);
-        const company = await Company.findByPk(user?.company_id);
         const project = await Project.findByPk(updatedForm.project_id);
         const formType = await FormType.findByPk(updatedForm.form_type_id);
-        const formsCount = await Form.count(
-          {
-            where: {
-              user_id: user?.user_id,
-              project_id: updatedForm.project_id,
-              status: 'approved'
-            },
-          }
-        )
         
-        if (updatedForm.form_type_id === 1) {
-          if (product_quantity >= 1 && product_quantity <= 50) {
-            removedPoint = 10
-          } else if (product_quantity > 50 && product_quantity <= 300) {
-            removedPoint = 20
-          } else if (product_quantity > 300) {
-            removedPoint = 40
-          }
-        } else if (updatedForm.form_type_id === 4) {
-          if (product_quantity >= 1 && product_quantity <= 50) {
-            removedPoint = 20
-          } else if (product_quantity > 50 && product_quantity <= 300) {
-            removedPoint = 50
-          } else if (product_quantity > 300) {
-            removedPoint = 100
-          }
-        } else if (updatedForm.form_type_id === 5) {
-          if (product_quantity >= 1 && product_quantity <= 50) {
-            removedPoint = 50
-          } else if (product_quantity > 50 && product_quantity <= 300) {
-            removedPoint = 100
-          } else if (product_quantity > 300) {
-            removedPoint = 200
-          }
-        }
-        // else if (updatedForm.form_type_id === 6) {
-        //   if (product_quantity >= 1 && product_quantity <= 50) {
-        //     removedPoint = 100
-        //   } else if (product_quantity > 50 && product_quantity <= 300) {
-        //     removedPoint = 200
-        //   } else if (product_quantity > 300) {
-        //     removedPoint = 400
-        //   }
-        // }
-        else if (updatedForm.form_type_id === 7) {
-          if (product_quantity >= 1 && product_quantity <= 50) {
-            removedPoint = 5
-          } else if (product_quantity > 50 && product_quantity <= 300) {
-            removedPoint = 10
-          } else if (product_quantity > 300) {
-            removedPoint = 20
-          }
-        } else if (updatedForm.form_type_id === 8) {
-          if (product_quantity >= 1 && product_quantity <= 50) {
-            removedPoint = 10
-          } else if (product_quantity > 50 && product_quantity <= 300) {
-            removedPoint = 25
-          } else if (product_quantity > 300) {
-            removedPoint = 50
-          }
-        } else if (updatedForm.form_type_id === 9) {
-          if (product_quantity >= 1 && product_quantity <= 50) {
-            removedPoint = 25
-          } else if (product_quantity > 50 && product_quantity <= 300) {
-            removedPoint = 50
-          } else if (product_quantity > 300) {
-            removedPoint = 100
-          }
-        } else if (updatedForm.form_type_id === 10) {
-          if (product_quantity >= 1 && product_quantity <= 50) {
-            removedPoint = 50
-          } else if (product_quantity > 50 && product_quantity <= 300) {
-            removedPoint = 100
-          } else if (product_quantity > 300) {
-            removedPoint = 200
-          }
-        }
-
-        // ! CHECK IF ONE OF FORM SUBMITTED BEFORE 14 DECEMBER 2024
-        if (user?.user_type === 'T2') {
-          if (formsCount === 5) {
-            removedCompletedPoint = 200
-          }
-        } else if (user?.user_type === 'T1') {
-          if (formsCount === 3) {
-            removedCompletedPoint = 200
-          }
-        }
-
-        if (user && formType) {
-          let point_reward = formType.point_reward;
-
-          if (formType.form_type_id === 3) {
-            point_reward = poc_done ? point_reward : point_reward / 2
-          }
-
-          user.total_points = (user.total_points || 0) - point_reward - removedPoint - removedCompletedPoint; // Assuming `points` field exists on User
-          user.accomplishment_total_points = (user.accomplishment_total_points || 0) - formType.point_reward - removedPoint - removedCompletedPoint;
-          await user.save();
-        }
-    
-        if (company && formType) {
-          let point_reward = formType.point_reward;
-
-          if (formType.form_type_id === 3) {
-            point_reward = poc_done ? point_reward : point_reward / 2
-          }
-          company.total_points = (company.total_points || 0) - point_reward - removedPoint - removedCompletedPoint; // Assuming `points` field exists on User
-          await company.save();
-        }
-    
         // await logAction(userId, req.method, 1, 'FORM', req.ip, req.get('User-Agent'));
     
         await UserAction.create({
@@ -394,12 +298,11 @@ export const createFormType = async (req: Request, res: Response) => {
 };
 
 export const formSubmission = async (req: any, res: Response) => {
-  const { form_type_id, form_data, project_id, product_quantity = 0, pic_done = false } = req.body;
+  const { form_type_id, form_data, project_id } = req.body;
 
   const transaction = await sequelize.transaction();
 
   const userId = req.user?.userId;
-  const companyId = req.user?.companyId;
   let isProjectFormCompleted = false;
   
   try {
@@ -408,109 +311,22 @@ export const formSubmission = async (req: any, res: Response) => {
       form_type_id,
       form_data,
       project_id,
-      status: Number(form_type_id) === 6 ? 'submitted' : 'approved'
+      status: 'submitted'
     })
 
     // Update user points based on the form submission
-    const company = await Company.findByPk(companyId, { transaction });
     const user = await User.findByPk(userId, { transaction });
     const formType = await FormType.findByPk(form_type_id, { transaction });
-    const allFormType = await FormType.findAll();
     const formsCount = await Form.findAll(
       {
         where: {
           user_id: userId,
           project_id: project_id,
-          status: 'approved'
+          status: 'submitted'
         },
         transaction
       }
     )
-
-    const completedFormTypeIds = formsCount.map(item => item.form_type_id);
-
-    let additionalPoint = 0;
-    let bonusPoint = 0;
-
-    if (form_type_id !== 1 && completedFormTypeIds.includes(5) && completedFormTypeIds.includes(6)) {
-      let counter = 4;
-      while (counter >= 1) {
-        if (!completedFormTypeIds.includes(counter)) {
-          bonusPoint += (allFormType[counter - 1].point_reward / 2)
-        }
-        counter--
-      }
-    }
-
-    if (formType) {
-      if (formType.form_type_id === 1) {
-        if (product_quantity >= 1 && product_quantity <= 50) {
-          additionalPoint = 10
-        } else if (product_quantity > 50 && product_quantity <= 300) {
-          additionalPoint = 20
-        } else if (product_quantity > 300) {
-          additionalPoint = 40
-        }
-      } else if (formType.form_type_id === 4) {
-        if (product_quantity >= 1 && product_quantity <= 50) {
-          additionalPoint = 20
-        } else if (product_quantity > 50 && product_quantity <= 300) {
-          additionalPoint = 50
-        } else if (product_quantity > 300) {
-          additionalPoint = 100
-        }
-      } else if (formType.form_type_id === 5) {
-        if (product_quantity >= 1 && product_quantity <= 50) {
-          additionalPoint = 50
-        } else if (product_quantity > 50 && product_quantity <= 300) {
-          additionalPoint = 100
-        } else if (product_quantity > 300) {
-          additionalPoint = 200
-        }
-      }
-      // else if (formType.form_type_id === 6) {
-      //   if (product_quantity >= 1 && product_quantity <= 50) {
-      //     additionalPoint = 100
-      //   } else if (product_quantity > 50 && product_quantity <= 300) {
-      //     additionalPoint = 200
-      //   } else if (product_quantity > 300) {
-      //     additionalPoint = 400
-      //   }
-      // }
-      else if (formType.form_type_id === 7) {
-        if (product_quantity >= 1 && product_quantity <= 50) {
-          additionalPoint = 5
-        } else if (product_quantity > 50 && product_quantity <= 300) {
-          additionalPoint = 10
-        } else if (product_quantity > 300) {
-          additionalPoint = 20
-        }
-      } else if (formType.form_type_id === 8) {
-        if (product_quantity >= 1 && product_quantity <= 50) {
-          additionalPoint = 10
-        } else if (product_quantity > 50 && product_quantity <= 300) {
-          additionalPoint = 25
-        } else if (product_quantity > 300) {
-          additionalPoint = 50
-        }
-      } else if (formType.form_type_id === 9) {
-        if (product_quantity >= 1 && product_quantity <= 50) {
-          additionalPoint = 25
-        } else if (product_quantity > 50 && product_quantity <= 300) {
-          additionalPoint = 50
-        } else if (product_quantity > 300) {
-          additionalPoint = 100
-        }
-      } else if (formType.form_type_id === 10) {
-        if (product_quantity >= 1 && product_quantity <= 50) {
-          additionalPoint = 50
-        } else if (product_quantity > 50 && product_quantity <= 300) {
-          additionalPoint = 100
-        } else if (product_quantity > 300) {
-          additionalPoint = 200
-        }
-      }
-    }
 
     const currentDate = dayjs();
 
@@ -518,41 +334,17 @@ export const formSubmission = async (req: any, res: Response) => {
     const targetDate = dayjs('2024-12-14');
 
     if (formType) {
-      if (formType.form_type_id !== 6 && currentDate.isBefore(targetDate, 'day')) {
+      if (currentDate.isBefore(targetDate, 'day')) {
         if (user?.user_type === 'T2') {
           if (formsCount.length === 6) {
-            additionalPoint += 200
             isProjectFormCompleted = true;
           }
         } else if (user?.user_type === 'T1') {
           if (formsCount.length === 4) {
-            additionalPoint += 200
             isProjectFormCompleted = true;
           }
         }
       }
-    }
-
-    if (user && formType && formType?.form_type_id !== 6) {
-      let point_reward = formType.point_reward;
-
-      if (formType.form_type_id === 3) {
-        point_reward = pic_done ? point_reward : point_reward / 2
-      }
-
-      user.total_points = (user.total_points || 0) + point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
-      user.accomplishment_total_points = (user.accomplishment_total_points || 0) + formType.point_reward + additionalPoint + bonusPoint;
-      await user.save({ transaction });
-    }
-
-    if (company && formType && formType?.form_type_id !== 6) {
-      let point_reward = formType.point_reward;
-
-      if (formType.form_type_id === 3) {
-        point_reward = pic_done ? point_reward : point_reward / 2
-      }
-      company.total_points = (company.total_points || 0) + point_reward + additionalPoint + bonusPoint; // Assuming `points` field exists on User
-      await company.save({ transaction });
     }
 
     // await logAction(userId, req.method, 1, 'FORM', req.ip, req.get('User-Agent'));
@@ -560,7 +352,7 @@ export const formSubmission = async (req: any, res: Response) => {
     await UserAction.create({
       user_id: userId,
       entity_type: 'FORM',
-      action_type: formType?.form_type_id === 6 ? 'SUBMITTED' : req.method,
+      action_type: 'SUBMITTED',
       form_id: submission.form_id,
       // ip_address: req.ip,
       // user_agent: req.get('User-Agent'),
@@ -595,7 +387,7 @@ export const getFormByProject = async (req: any, res: Response) => {
           user_id: userId,
           project_id: projectId,
           status: {
-            [Op.or]: ['approved', 'submitted', 'rejected']
+            [Op.or]: ['approved', 'submitted']
           }
         },
         order: [['created_at', 'DESC']],
